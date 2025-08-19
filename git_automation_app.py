@@ -42,6 +42,11 @@ def find_repo_name_from_url(url):
 def generate_changelog_entry(author, story_id, up_file, down_file, obj_type):
     date_part = datetime.datetime.now().strftime("%Y%m%d")
     comment = story_id
+
+    # Ensure paths use forward slashes to prevent weird characters in XML
+    up_file = up_file.replace("\\", "/")
+    down_file = down_file.replace("\\", "/")
+
     if obj_type == "Table":
         changelog = (
             f'<changeSet author="{author}" id="{date_part}_{story_id}">\n'
@@ -53,13 +58,13 @@ def generate_changelog_entry(author, story_id, up_file, down_file, obj_type):
             f'</changeSet>'
         )
     elif obj_type in ("View", "Procedure"):
-        folder = "views" if obj_type == "View" else "procedures"
+        # Use the same path formatting as Table (no edl/views/ or edl/procedures/ prefix)
         changelog = (
             f'<changeSet author="{author}" id="{date_part}_{story_id}" runOnChange="true" runInTransaction="true">\n'
             f'    <comment>{comment}</comment>\n'
-            f'    <sqlFile path="edl/{folder}/{up_file}" endDelimiter="" encoding="UTF-8"/>\n'
+            f'    <sqlFile path="{up_file}" endDelimiter="" encoding="UTF-8"/>\n'
             f'    <rollback>\n'
-            f'        <sqlFile path="edl/{folder}/{down_file}" relativeToChangelogFile="true"/>\n'
+            f'        <sqlFile path="{down_file}" relativeToChangelogFile="true"/>\n'
             f'    </rollback>\n'
             f'</changeSet>'
         )
@@ -417,7 +422,6 @@ def main():
                 status_label.config(text="Error")
                 return
 
-        # Source file pick dialogs -- do not specify initialdir (default OS last accessed)
         if workflow_mode.get() == "GE Scripts":
             checkpoint_file = filedialog.askopenfilename(title="Select Checkpoint file")
             if not checkpoint_file:
@@ -428,7 +432,6 @@ def main():
                 messagebox.showerror("Error", "Expectation file is required.")
                 return
 
-            # Target folder dialogs -- initialdir set to repo folder
             checkpoint_target = filedialog.askdirectory(
                 title="Select target folder for Checkpoint file",
                 initialdir=repo_path if repo_path else None
@@ -470,7 +473,6 @@ def main():
             down_file = os.path.basename(expectation_file)
             target_folders = {"up": checkpoint_target, "down": expectation_target}
         else:
-            # DB Objects mode
             up_file_path = filedialog.askopenfilename(title="Select UP migration file")
             if not up_file_path:
                 messagebox.showerror("Error", "UP migration file required.")
@@ -520,12 +522,10 @@ def main():
                     messagebox.showinfo("Skipped", "No changelog selected; skipping update")
                 else:
                     changelog_dir = os.path.dirname(os.path.abspath(changelog_path))
-                    if obj_type == "Table":
-                        up_rel = os.path.relpath(os.path.join(target_folders["up"], up_file), changelog_dir)
-                        down_rel = os.path.relpath(os.path.join(target_folders["down"], down_file), changelog_dir)
-                    else:
-                        up_rel = up_file
-                        down_rel = down_file
+                    # For all obj types (Table, View, Procedure), just use relative paths directly (no folder prefix)
+                    up_rel = os.path.relpath(os.path.join(target_folders["up"], up_file), changelog_dir)
+                    down_rel = os.path.relpath(os.path.join(target_folders["down"], down_file), changelog_dir)
+
                     changelog_entry = generate_changelog_entry(username, story, up_rel, down_rel, obj_type)
                     if append_to_changelog(changelog_path, changelog_entry):
                         messagebox.showinfo("Success", "Changelog updated successfully")
@@ -595,22 +595,6 @@ def main():
     btn_clone.config(command=clone_repo)
     btn_select.config(command=select_repo)
     btn_start.config(command=start_automation)
-
-    def update_branch_name(*args):
-        story = ent_story.get().strip()
-        if story:
-            ent_branch.delete(0, tk.END)
-            ent_branch.insert(0, f"{story}_{username}")
-        else:
-            ent_branch.delete(0, tk.END)
-
-    ent_story.bind("<KeyRelease>", update_branch_name)
-
-    def enable_start():
-        if repo_path:
-            btn_start.config(state=tk.NORMAL)
-        else:
-            btn_start.config(state=tk.DISABLED)
 
     enable_start()
 
