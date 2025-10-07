@@ -11,18 +11,15 @@ import platform
 
 CONFIG_FILE = "config.json"
 
-
 def load_config():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r") as f:
             return json.load(f)
     return {}
 
-
 def save_config(data):
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f)
-
 
 def run_cmd(cmd, cwd=None):
     try:
@@ -31,22 +28,17 @@ def run_cmd(cmd, cwd=None):
     except Exception as e:
         return False, str(e)
 
-
 def find_repo_name_from_url(url):
     m = re.search(r"/([^/]+?)(?:\.git)?$", url)
     if m:
         return m.group(1)
     return "cloned_repo"
 
-
 def generate_changelog_entry(author, story_id, up_file, down_file, obj_type):
     date_part = datetime.datetime.now().strftime("%Y%m%d")
     comment = story_id
-
-    # Ensure paths use forward slashes to prevent weird characters in XML
     up_file = up_file.replace("\\", "/")
     down_file = down_file.replace("\\", "/")
-
     if obj_type == "Table":
         changelog = (
             f'<changeSet author="{author}" id="{date_part}_{story_id}">\n'
@@ -58,7 +50,6 @@ def generate_changelog_entry(author, story_id, up_file, down_file, obj_type):
             f'</changeSet>'
         )
     elif obj_type in ("View", "Procedure"):
-        # Use the same path formatting as Table (no edl/views/ or edl/procedures/ prefix)
         changelog = (
             f'<changeSet author="{author}" id="{date_part}_{story_id}" runOnChange="true" runInTransaction="true">\n'
             f'    <comment>{comment}</comment>\n'
@@ -69,7 +60,6 @@ def generate_changelog_entry(author, story_id, up_file, down_file, obj_type):
             f'</changeSet>'
         )
     else:
-        # fallback same as Table
         changelog = (
             f'<changeSet author="{author}" id="{date_part}_{story_id}">\n'
             f'    <comment>{comment}</comment>\n'
@@ -81,7 +71,6 @@ def generate_changelog_entry(author, story_id, up_file, down_file, obj_type):
         )
     return changelog
 
-
 def append_to_changelog(changelog_path, changelog_entry):
     try:
         with open(changelog_path, "r", encoding="utf-8") as f:
@@ -92,7 +81,6 @@ def append_to_changelog(changelog_path, changelog_entry):
                 "Selected file is not a valid changelog XML (missing </databaseChangeLog> tag).",
             )
             return False
-
         new_content = re.sub(
             r"\n*\s*</databaseChangeLog>",
             f"\n{changelog_entry}\n</databaseChangeLog>",
@@ -105,7 +93,6 @@ def append_to_changelog(changelog_path, changelog_entry):
         messagebox.showerror("Error", f"Failed to update changelog file:\n{e}")
         return False
 
-
 def open_file_in_editor(path):
     try:
         if platform.system() == "Windows":
@@ -116,7 +103,6 @@ def open_file_in_editor(path):
             subprocess.Popen(["xdg-open", path])
     except Exception as e:
         messagebox.showerror("Open Error", f"Could not open file:\n{e}")
-
 
 def git_get_modified_files(repo_path):
     success, output = run_cmd("git status --porcelain", cwd=repo_path)
@@ -131,7 +117,6 @@ def git_get_modified_files(repo_path):
             files.append(filename)
     return files
 
-
 def show_db_object_type_dialog(parent):
     dialog = tk.Toplevel(parent)
     dialog.title("Select DB Object Type")
@@ -142,39 +127,32 @@ def show_db_object_type_dialog(parent):
     tk.Label(dialog, text="Select the DB Object Type for changelog:", font=("Arial", 12, "bold")).pack(
         padx=20, pady=10
     )
-
     for obj_type in ("Table", "View", "Procedure"):
         rb = tk.Radiobutton(dialog, text=obj_type, variable=selected, value=obj_type, font=("Arial", 11))
         rb.pack(anchor="w", padx=40, pady=2)
 
     confirmed = {"ok": False}
-
     def on_ok():
         if selected.get() not in ("Table", "View", "Procedure"):
             messagebox.showwarning("Selection required", "Please select a DB Object Type to proceed.")
             return
         confirmed["ok"] = True
         dialog.destroy()
-
     def on_cancel():
         dialog.destroy()
 
     btn_frame = tk.Frame(dialog)
     btn_frame.pack(pady=15)
-
     btn_ok = tk.Button(btn_frame, text="OK", width=12, command=on_ok)
     btn_ok.pack(side=tk.LEFT, padx=10)
-
     btn_cancel = tk.Button(btn_frame, text="Cancel", width=12, command=on_cancel)
     btn_cancel.pack(side=tk.LEFT, padx=10)
 
     parent.wait_window(dialog)
-
     if confirmed["ok"]:
         return selected.get()
     else:
         return None
-
 
 def get_github_pr_url(repo_path, branch):
     success, out = run_cmd("git config --get remote.origin.url", cwd=repo_path)
@@ -186,32 +164,24 @@ def get_github_pr_url(repo_path, branch):
             return f"https://github.com/{owner}/{repository}/pull/new/{branch}"
     return None
 
-
 def show_pr_popup(parent, url):
     popup = tk.Toplevel(parent)
     popup.title("Create Pull Request")
     popup.resizable(False, False)
     popup.grab_set()
-
     tk.Label(popup, text="Pull Request URL:", font=("Arial", 12, "bold")).pack(padx=20, pady=(15, 5))
     link = tk.Label(popup, text=url, fg="blue", cursor="hand2", font=("Arial", 11, "underline"))
     link.pack(padx=20, pady=(0, 15))
-
     def open_url(event):
         webbrowser.open(url)
         popup.destroy()
-
     link.bind("<Button-1>", open_url)
-
 
 def main():
     root = tk.Tk()
     root.title("Git Automation App")
-
-    # Initial window size set to fit inputs + buttons only
     root.geometry("750x400")
 
-    # Load config or prompt for user info on first run
     config = load_config()
     if not config.get("username"):
         username = simpledialog.askstring("Setup", "Enter your username (for tracking):", parent=root)
@@ -243,52 +213,38 @@ def main():
     repo_path = None
     workflow_mode = tk.StringVar(value="DB Objects")
 
-    # UI setup
     top_frame = tk.Frame(root)
     top_frame.pack(padx=10, pady=10, fill=tk.X)
-
     btn_clone = tk.Button(top_frame, text="Clone Repository", width=20)
     btn_clone.pack(side=tk.LEFT, padx=5)
-
     btn_select = tk.Button(top_frame, text="Select Existing Repo", width=20)
     btn_select.pack(side=tk.LEFT, padx=5)
-
     label_repo = tk.Label(root, text="No repository selected", relief=tk.SUNKEN)
     label_repo.pack(fill=tk.X, padx=10, pady=5)
 
-    # Workflow mode
     wf_frame = tk.LabelFrame(root, text="Select Workflow Mode")
     wf_frame.pack(fill=tk.X, padx=10, pady=5)
-
     rb_db = tk.Radiobutton(wf_frame, text="DB Objects", variable=workflow_mode, value="DB Objects")
     rb_db.pack(anchor=tk.W, padx=10, pady=2)
-
     rb_ge = tk.Radiobutton(wf_frame, text="GE Scripts", variable=workflow_mode, value="GE Scripts")
     rb_ge.pack(anchor=tk.W, padx=10, pady=2)
 
-    # Input fields
     input_frame = tk.Frame(root)
     input_frame.pack(fill=tk.X, padx=10, pady=5)
-
     tk.Label(input_frame, text="Story ID:", width=14, anchor=tk.E).grid(row=0, column=0, sticky=tk.E)
     ent_story = tk.Entry(input_frame, width=32)
     ent_story.grid(row=0, column=1, pady=3, sticky=tk.W)
-
     tk.Label(input_frame, text="Branch Name:", width=14, anchor=tk.E).grid(row=1, column=0, sticky=tk.E)
     ent_branch = tk.Entry(input_frame, width=32)
     ent_branch.grid(row=1, column=1, pady=3, sticky=tk.W)
-
     tk.Label(input_frame, text="Commit Headline:", width=14, anchor=tk.E).grid(row=2, column=0, sticky=tk.E)
     ent_commit = tk.Entry(input_frame, width=50)
     ent_commit.grid(row=2, column=1, pady=3, sticky=tk.W)
 
     btn_start = tk.Button(root, text="Start Automation", state=tk.DISABLED)
     btn_start.pack(pady=10)
-
     status_label = tk.Label(root, text="", fg="blue")
     status_label.pack(fill=tk.X)
-
-    # Create output text widget but do NOT pack yet (hidden initially)
     output_text = tk.Text(root, height=20)
 
     def update_branch_name(*args):
@@ -298,7 +254,6 @@ def main():
             ent_branch.insert(0, f"{story}_{username}")
         else:
             ent_branch.delete(0, tk.END)
-
     ent_story.bind("<KeyRelease>", update_branch_name)
 
     def enable_start():
@@ -350,15 +305,12 @@ def main():
         if not repos:
             messagebox.showwarning("No Repos", "No git repositories found")
             return
-
         selected = []
-
         def on_select(event):
             sel = lb.curselection()
             if sel:
                 selected.append(repos[sel[0]])
                 top.destroy()
-
         top = tk.Toplevel(root)
         top.title("Select Repository")
         tk.Label(top, text="Select repository:", font=("Arial", 12, "bold")).pack(
@@ -387,10 +339,8 @@ def main():
         if not story or not branch or not commit_headline:
             messagebox.showerror("Error", "Please fill all required fields")
             return
-
         full_branch = branch if "_" in branch else f"{story}_{branch}"
 
-        # Show log area now (pack Text widget and expand window height)
         if not output_text.winfo_ismapped():
             output_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
             current_width = root.winfo_width()
@@ -399,18 +349,14 @@ def main():
 
         status_label.config(text="Running git commands...")
         root.update()
-
-        # Set git user config locally
         run_cmd(f'git config user.name "{git_name}"', cwd=repo_path)
         run_cmd(f'git config user.email "{git_email}"', cwd=repo_path)
-
         cmds = [
             ("git fetch origin", repo_path),
             ("git checkout dev", repo_path),
             ("git reset --hard origin/dev", repo_path),
             (f'git checkout -b "{full_branch}"', repo_path),
         ]
-
         for cmd, cwd in cmds:
             status_label.config(text=f"Running: {cmd}")
             root.update()
@@ -431,7 +377,6 @@ def main():
             if not expectation_file:
                 messagebox.showerror("Error", "Expectation file is required.")
                 return
-
             checkpoint_target = filedialog.askdirectory(
                 title="Select target folder for Checkpoint file",
                 initialdir=repo_path if repo_path else None
@@ -441,7 +386,6 @@ def main():
                     "Error", "Target folder for Checkpoint file is required."
                 )
                 return
-
             expectation_target = filedialog.askdirectory(
                 title="Select target folder for Expectation file",
                 initialdir=repo_path if repo_path else None
@@ -451,7 +395,6 @@ def main():
                     "Error", "Target folder for Expectation file is required."
                 )
                 return
-
             repo_abs = os.path.abspath(repo_path)
             for folder, name in [(checkpoint_target, "Checkpoint"), (expectation_target, "Expectation")]:
                 folder_abs = os.path.abspath(folder)
@@ -461,14 +404,12 @@ def main():
                         f"{name} target folder must be inside repository.",
                     )
                     return
-
             try:
                 shutil.copy(checkpoint_file, checkpoint_target)
                 shutil.copy(expectation_file, expectation_target)
             except Exception as e:
                 messagebox.showerror("File Copy Error", f"Failed to copy files:\n{e}")
                 return
-
             up_file = os.path.basename(checkpoint_file)
             down_file = os.path.basename(expectation_file)
             target_folders = {"up": checkpoint_target, "down": expectation_target}
@@ -481,7 +422,6 @@ def main():
             if not down_file_path:
                 messagebox.showerror("Error", "DOWN migration file required.")
                 return
-
             while True:
                 target_folder = filedialog.askdirectory(
                     title="Select target folder INSIDE repository",
@@ -496,18 +436,17 @@ def main():
                     messagebox.showerror("Error", "Target folder must be inside repository.")
                 else:
                     break
-
             try:
                 shutil.copy(up_file_path, target_folder)
                 shutil.copy(down_file_path, target_folder)
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to copy files:\n{e}")
                 return
-
             up_file = os.path.basename(up_file_path)
             down_file = os.path.basename(down_file_path)
             target_folders = {"up": target_folder, "down": target_folder}
 
+        changelog_file_to_add = None
         if workflow_mode.get() == "DB Objects":
             obj_type = show_db_object_type_dialog(root)
             if obj_type is None:
@@ -522,19 +461,24 @@ def main():
                     messagebox.showinfo("Skipped", "No changelog selected; skipping update")
                 else:
                     changelog_dir = os.path.dirname(os.path.abspath(changelog_path))
-                    # For all obj types (Table, View, Procedure), just use relative paths directly (no folder prefix)
-                    up_rel = os.path.relpath(os.path.join(target_folders["up"], up_file), changelog_dir)
-                    down_rel = os.path.relpath(os.path.join(target_folders["down"], down_file), changelog_dir)
-
+                    if obj_type == "Table":
+                        up_rel = os.path.relpath(os.path.join(target_folders["up"], up_file), changelog_dir)
+                        down_rel = os.path.relpath(os.path.join(target_folders["down"], down_file), changelog_dir)
+                    else:
+                        up_rel = up_file
+                        down_rel = down_file
                     changelog_entry = generate_changelog_entry(username, story, up_rel, down_rel, obj_type)
                     if append_to_changelog(changelog_path, changelog_entry):
                         messagebox.showinfo("Success", "Changelog updated successfully")
                         open_file_in_editor(changelog_path)
+                        changelog_file_to_add = changelog_path
 
         files_to_add = [
             os.path.join(target_folders["up"], up_file),
             os.path.join(target_folders["down"], down_file),
         ]
+        if workflow_mode.get() == "DB Objects" and changelog_file_to_add:
+            files_to_add.append(changelog_file_to_add)
 
         for file_path in files_to_add:
             try:
@@ -555,7 +499,6 @@ def main():
         if not modified_files:
             messagebox.showinfo("No changes", "No modified/new files to commit.")
             return
-
         file_list_text = "\n".join(modified_files)
         if not messagebox.askyesno(
             "Confirm Commit",
@@ -565,7 +508,6 @@ def main():
             return
 
         commit_msg = f"AB#{story}: {commit_headline}"
-
         status_label.config(text="Committing changes...")
         root.update()
         success, out = run_cmd(f'git commit -m "{commit_msg}"', cwd=repo_path)
@@ -591,15 +533,11 @@ def main():
         else:
             status_label.config(text="Automation complete.")
 
-    # Bind buttons
     btn_clone.config(command=clone_repo)
     btn_select.config(command=select_repo)
     btn_start.config(command=start_automation)
-
     enable_start()
-
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()
