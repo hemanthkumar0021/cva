@@ -1,0 +1,76 @@
+CREATE OR REPLACE PROCEDURE UTIL_DB.UTIL_SCHEMA.GEN_SECURE_VIEW_DDL(
+    SRC_DB STRING,
+    SRC_SCHEMA STRING,
+    SRC_TABLE STRING,
+    TGT_DB STRING,
+    TGT_SCHEMA STRING,
+    TGT_VIEW STRING,
+    COLUMN_LIST STRING
+)
+RETURNS STRING
+LANGUAGE SQL
+AS
+$$
+DECLARE
+    V_COL_DDL    STRING;
+    V_COL_SELECT STRING;
+    V_SQL        STRING;
+BEGIN
+    WITH MASK_COLS AS (
+        SELECT UPPER(TRIM(VALUE)) AS COL_NAME
+        FROM TABLE(SPLIT_TO_TABLE(:COLUMN_LIST, ','))
+        WHERE TRIM(VALUE) IS NOT NULL
+          AND TRIM(VALUE) <> ''
+    ),
+    SRC_COLS AS (
+        SELECT
+            COLUMN_NAME,
+            COMMENT,
+            ORDINAL_POSITION
+        FROM IDENTIFIER(:SRC_DB || '.INFORMATION_SCHEMA.COLUMNS')
+        WHERE TABLE_SCHEMA = UPPER(:SRC_SCHEMA)
+          AND TABLE_NAME   = UPPER(:SRC_TABLE)
+    ),
+    FINAL_COLS AS (
+        SELECT
+            S.COLUMN_NAME,
+            S.COMMENT,
+            S.ORDINAL_POSITION,
+            CASE
+                WHEN M.COL_NAME IS NOT NULL THEN 1
+                ELSE 0
+            END AS IS_MASKED
+        FROM SRC_COLS S
+        LEFT JOIN MASK_COLS M
+            ON S.COLUMN_NAME = M.COL_NAME
+    )
+    SELECT
+        LISTAGG(
+            CASE
+                WHEN IS_MASKED = 1 THEN
+                    COLUMN_NAME || ' WITH MASKING POLICY POLICIES.CLS_PHI_STRING COMMENT ' ||
+                    CHAR(39) || COALESCE(REPLACE(COMMENT, CHAR(39), CHAR(39)||CHAR(39)), '') || CHAR(39)
+                ELSE
+                    COLUMN_NAME || ' COMMENT ' ||
+                    CHAR(39) || COALESCE(REPLACE(COMMENT, CHAR(39), CHAR(39)||CHAR(39)), '') || CHAR(39)
+            END,
+            ',\n'
+        ) WITHIN GROUP (ORDER BY ORDINAL_POSITION),
+        LISTAGG(COLUMN_NAME, ',\n') WITHIN GROUP (ORDER BY ORDINAL_POSITION)
+    INTO :V_COL_DDL, :V_COL_SELECT
+    FROM FINAL_COLS;
+
+    V_SQL :=
+          'CREATE OR REPLACE SECURE VIEW ' || TGT_DB || '.' || TGT_SCHEMA || '.' || TGT_VIEW || CHR(10)
+       || '(' || CHR(10)
+       || V_COL_DDL || CHR(10)
+       || ')' || CHR(10)
+       || 'COPY GRANTS' || CHR(10)
+       || 'AS' || CHR(10)
+       || 'SELECT' || CHR(10)
+       || V_COL_SELECT || CHR(10)
+       || 'FROM ' || SRC_DB || '.' || SRC_SCHEMA || '.' || SRC_TABLE || ';';
+
+    RETURN V_SQL;
+END;
+$$;
