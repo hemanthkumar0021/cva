@@ -12,53 +12,51 @@ LANGUAGE SQL
 AS
 $$
 DECLARE
-    V_COL_DDL    STRING;
+    V_COL_DDL STRING;
     V_COL_SELECT STRING;
-    V_SQL        STRING;
+    V_SQL STRING;
+    V_META_SQL STRING;
 BEGIN
-    WITH MASK_COLS AS (
-        SELECT UPPER(TRIM(VALUE)) AS COL_NAME
-        FROM TABLE(SPLIT_TO_TABLE(:COLUMN_LIST, ','))
-        WHERE TRIM(VALUE) IS NOT NULL
-          AND TRIM(VALUE) <> ''
-    ),
-    SRC_COLS AS (
+    V_META_SQL := '
+        WITH MASK_COLS AS (
+            SELECT UPPER(TRIM(VALUE)) AS COL_NAME
+            FROM TABLE(SPLIT_TO_TABLE(''' || REPLACE(COLUMN_LIST, '''', '''''') || ''', '',''))
+            WHERE TRIM(VALUE) IS NOT NULL
+              AND TRIM(VALUE) <> ''''
+        ),
+        SRC_COLS AS (
+            SELECT
+                COLUMN_NAME,
+                COMMENT,
+                ORDINAL_POSITION
+            FROM ' || SRC_DB || '.INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = ''' || UPPER(SRC_SCHEMA) || '''
+              AND TABLE_NAME   = ''' || UPPER(SRC_TABLE) || '''
+        ),
+        FINAL_COLS AS (
+            SELECT
+                S.COLUMN_NAME,
+                S.COMMENT,
+                S.ORDINAL_POSITION,
+                CASE WHEN M.COL_NAME IS NOT NULL THEN 1 ELSE 0 END AS IS_MASKED
+            FROM SRC_COLS S
+            LEFT JOIN MASK_COLS M
+              ON S.COLUMN_NAME = M.COL_NAME
+        )
         SELECT
-            COLUMN_NAME,
-            COMMENT,
-            ORDINAL_POSITION
-        FROM IDENTIFIER(:SRC_DB || '.INFORMATION_SCHEMA.COLUMNS')
-        WHERE TABLE_SCHEMA = UPPER(:SRC_SCHEMA)
-          AND TABLE_NAME   = UPPER(:SRC_TABLE)
-    ),
-    FINAL_COLS AS (
-        SELECT
-            S.COLUMN_NAME,
-            S.COMMENT,
-            S.ORDINAL_POSITION,
-            CASE
-                WHEN M.COL_NAME IS NOT NULL THEN 1
-                ELSE 0
-            END AS IS_MASKED
-        FROM SRC_COLS S
-        LEFT JOIN MASK_COLS M
-            ON S.COLUMN_NAME = M.COL_NAME
-    )
-    SELECT
-        LISTAGG(
-            CASE
-                WHEN IS_MASKED = 1 THEN
-                    COLUMN_NAME || ' WITH MASKING POLICY POLICIES.CLS_PHI_STRING COMMENT ' ||
-                    CHAR(39) || COALESCE(REPLACE(COMMENT, CHAR(39), CHAR(39)||CHAR(39)), '') || CHAR(39)
-                ELSE
-                    COLUMN_NAME || ' COMMENT ' ||
-                    CHAR(39) || COALESCE(REPLACE(COMMENT, CHAR(39), CHAR(39)||CHAR(39)), '') || CHAR(39)
-            END,
-            ',\n'
-        ) WITHIN GROUP (ORDER BY ORDINAL_POSITION),
-        LISTAGG(COLUMN_NAME, ',\n') WITHIN GROUP (ORDER BY ORDINAL_POSITION)
-    INTO :V_COL_DDL, :V_COL_SELECT
-    FROM FINAL_COLS;
+            LISTAGG(
+                CASE
+                    WHEN IS_MASKED = 1 THEN
+                        COLUMN_NAME || '' WITH MASKING POLICY POLICIES.CLS_PHI_STRING COMMENT '''' || COALESCE(REPLACE(COMMENT, '''''''', ''''''''''''), '''') || ''''''
+                    ELSE
+                        COLUMN_NAME || '' COMMENT '''' || COALESCE(REPLACE(COMMENT, '''''''', ''''''''''''), '''') || ''''''
+                END,
+                '',\n''
+            ) WITHIN GROUP (ORDER BY ORDINAL_POSITION) AS COL_DDL,
+            LISTAGG(COLUMN_NAME, '',\n'') WITHIN GROUP (ORDER BY ORDINAL_POSITION) AS COL_SELECT
+        FROM FINAL_COLS';
+
+    EXECUTE IMMEDIATE :V_META_SQL INTO :V_COL_DDL, :V_COL_SELECT;
 
     V_SQL :=
           'CREATE OR REPLACE SECURE VIEW ' || TGT_DB || '.' || TGT_SCHEMA || '.' || TGT_VIEW || CHR(10)
