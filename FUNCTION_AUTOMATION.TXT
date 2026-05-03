@@ -16,6 +16,8 @@ DECLARE
     V_COL_SELECT STRING;
     V_SQL STRING;
     V_META_SQL STRING;
+    RES RESULTSET;
+    CUR CURSOR FOR RES;
 BEGIN
     V_META_SQL := '
         WITH MASK_COLS AS (
@@ -47,16 +49,19 @@ BEGIN
             LISTAGG(
                 CASE
                     WHEN IS_MASKED = 1 THEN
-                        COLUMN_NAME || '' WITH MASKING POLICY POLICIES.CLS_PHI_STRING COMMENT '''' || COALESCE(REPLACE(COMMENT, '''''''', ''''''''''''), '''') || ''''''
+                        COLUMN_NAME || '' WITH MASKING POLICY POLICIES.CLS_PHI_STRING COMMENT '''' || COALESCE(REPLACE(COMMENT, '''''''', '''''''''''), '''') || ''''''
                     ELSE
-                        COLUMN_NAME || '' COMMENT '''' || COALESCE(REPLACE(COMMENT, '''''''', ''''''''''''), '''') || ''''''
+                        COLUMN_NAME || '' COMMENT '''' || COALESCE(REPLACE(COMMENT, '''''''', '''''''''''), '''') || ''''''
                 END,
                 '',\n''
             ) WITHIN GROUP (ORDER BY ORDINAL_POSITION) AS COL_DDL,
             LISTAGG(COLUMN_NAME, '',\n'') WITHIN GROUP (ORDER BY ORDINAL_POSITION) AS COL_SELECT
         FROM FINAL_COLS';
 
-    EXECUTE IMMEDIATE :V_META_SQL INTO :V_COL_DDL, :V_COL_SELECT;
+    RES := (EXECUTE IMMEDIATE :V_META_SQL);
+    OPEN CUR;
+    FETCH CUR INTO V_COL_DDL, V_COL_SELECT;
+    CLOSE CUR;
 
     V_SQL :=
           'CREATE OR REPLACE SECURE VIEW ' || TGT_DB || '.' || TGT_SCHEMA || '.' || TGT_VIEW || CHR(10)
