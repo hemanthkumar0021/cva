@@ -1,0 +1,81 @@
+WITH metadata AS (
+    SELECT
+        CONVERT_TIMEZONE('UTC','America/Chicago', ELT_GET_CURRENT_SN_SNAPSHOT_TS())::TIMESTAMP_NTZ AS snapshot_ts_cst
+),
+
+date_range AS (
+    SELECT
+        stlv.SYS_ID,
+        stlv.SYS_CREATED_ON_CST AS scrub,
+        u.RESOLVED_DATE_REPORTING AS load_v,
+        DATEADD('day', seq4(), TO_DATE(stlv.SYS_CREATED_ON_CST)) AS active_date
+    FROM AJPVTG_STG_MFSTAR_DB.BASE.VW_X_UMGEN_CS_CS_CRT_STLV stlv
+    LEFT JOIN AJPVTG_STG_MFSTAR_DB.BASE.VW_STN_USER usr
+        ON usr.SYS_ID = stlv.ASSIGNED_TO
+    CROSS JOIN metadata m
+    CROSS JOIN TABLE(
+        GENERATOR(
+            ROWCOUNT => 1000
+        )
+    ) g
+    WHERE seq4() <= DATEDIFF(
+        'day',
+        TO_DATE(stlv.SYS_CREATED_ON_CST),
+        TO_DATE(u.RESOLVED_DATE_REPORTING)
+    )
+),
+
+business_days AS (
+    SELECT
+        dr.SYS_ID,
+        dr.scrub,
+        dr.load_v,
+        dr.active_date
+    FROM date_range dr
+    LEFT JOIN HOLIDAYS h
+        ON dr.active_date = h.HOLIDAY_DATE
+    WHERE DAYOFWEEK(dr.active_date) BETWEEN 1 AND 5
+      AND h.HOLIDAY_DATE IS NULL
+)
+
+SELECT
+    stlv.SYS_ID,
+    stlv.SYS_CREATED_ON_CST,
+    stlv.SYS_UPDATED_ON_CST,
+    stlv.DELETED_AT_CST,
+    n.SNAPSHOT_TS_CST AS SNAPSHOT_TS_CST,
+    NMBER,
+    WORK_ITEM_TYPE,
+    PROJECT_ID,
+    CREATED_CENTRAL,
+    u.RESOLVED_DATE_REPORTING,
+    SKILLS,
+    STATE,
+    ASSIGNED_TO,
+    usr.MANAGER AS "ASSIGNED_TO_MANAGER",
+    RESOLVED_AT_CST AS RESOLVED_AT,
+    BUSINESS_AREA,
+    COUNT(bd.active_date) - 1 AS SCRUB_TO_LOAD_TAT
+FROM AJPVTG_STG_MFSTAR_DB.BASE.VW_X_UMGEN_CS_CS_CRT_STLV stlv
+LEFT JOIN AJPVTG_STG_MFSTAR_DB.BASE.VW_STN_USER usr
+    ON usr.SYS_ID = stlv.ASSIGNED_TO
+CROSS JOIN metadata n
+LEFT JOIN business_days bd
+    ON stlv.SYS_ID = bd.SYS_ID
+GROUP BY
+    stlv.SYS_ID,
+    stlv.SYS_CREATED_ON_CST,
+    stlv.SYS_UPDATED_ON_CST,
+    stlv.DELETED_AT_CST,
+    n.SNAPSHOT_TS_CST,
+    NMBER,
+    WORK_ITEM_TYPE,
+    PROJECT_ID,
+    CREATED_CENTRAL,
+    u.RESOLVED_DATE_REPORTING,
+    SKILLS,
+    STATE,
+    ASSIGNED_TO,
+    usr.MANAGER,
+    RESOLVED_AT_CST,
+    BUSINESS_AREA;
