@@ -1,5 +1,1 @@
-openssl version
-
-openssl genrsa -out rsa_key.p8 -aes256 2048
-
-openssl rsa -pubout -in rsa_key.p8 -out rsa_key.pub
+ALTER USER your_snowflake_username SET RSA_PUBLIC_KEY='MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv1A...';
