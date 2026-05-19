@@ -1,40 +1,5 @@
-SELECT 
-    stlv.SYS_ID,
-    stlv.SYS_CREATED_ON_CST,
-    u.RESOLVED_DATE_REPORTING,
-    CASE 
-        WHEN (
-            DATEDIFF('day', TO_DATE(stlv.SYS_CREATED_ON_CST), TO_DATE(u.RESOLVED_DATE_REPORTING)) 
-            - (
-                SELECT COUNT(*) 
-                FROM TABLE(GENERATOR(ROWCOUNT => 1000)) g
-                WHERE g.seq4() <= DATEDIFF('day', TO_DATE(stlv.SYS_CREATED_ON_CST), TO_DATE(u.RESOLVED_DATE_REPORTING))
-                  AND DAYOFWEEKISO(DATEADD('day', g.seq4(), TO_DATE(stlv.SYS_CREATED_ON_CST))) IN (6, 7)
-            )
-            - (
-                SELECT COUNT(*) 
-                FROM HOLIDAYS h
-                WHERE TO_DATE(h.holiday_date) BETWEEN TO_DATE(stlv.SYS_CREATED_ON_CST) AND TO_DATE(u.RESOLVED_DATE_REPORTING)
-                  AND DAYOFWEEKISO(TO_DATE(h.holiday_date)) <= 5
-            ) 
-            - 1
-        ) < 0 THEN 0
-        ELSE (
-            DATEDIFF('day', TO_DATE(stlv.SYS_CREATED_ON_CST), TO_DATE(u.RESOLVED_DATE_REPORTING)) 
-            - (
-                SELECT COUNT(*) 
-                FROM TABLE(GENERATOR(ROWCOUNT => 1000)) g
-                WHERE g.seq4() <= DATEDIFF('day', TO_DATE(stlv.SYS_CREATED_ON_CST), TO_DATE(u.RESOLVED_DATE_REPORTING))
-                  AND DAYOFWEEKISO(DATEADD('day', g.seq4(), TO_DATE(stlv.SYS_CREATED_ON_CST))) IN (6, 7)
-            )
-            - (
-                SELECT COUNT(*) 
-                FROM HOLIDAYS h
-                WHERE TO_DATE(h.holiday_date) BETWEEN TO_DATE(stlv.SYS_CREATED_ON_CST) AND TO_DATE(u.RESOLVED_DATE_REPORTING)
-                  AND DAYOFWEEKISO(TO_DATE(h.holiday_date)) <= 5
-            ) 
-            - 1
-        )
-    END AS SCRUB_TO_LOAD_TAT
-FROM AJPVTG_STG_MFSTAR_DB.BASE.VW_X_UMGEN_CS_CS_CRT_STLV stlv
--- Add your existing joins here
+openssl version
+
+openssl genrsa -out rsa_key.p8 -aes256 2048
+
+openssl rsa -pubout -in rsa_key.p8 -out rsa_key.pub
