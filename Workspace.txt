@@ -23,8 +23,6 @@ date_range AS (
         TO_DATE(stlv.SYS_CREATED_ON_CST),
         TO_DATE(U_RESOLVED_DATE_REPORTING)
     )
-    -- Explicitly ignore items that are not completed
-    AND U_RESOLVED_DATE_REPORTING IS NOT NULL 
 ),
 
 HOLIDAYS AS
@@ -84,55 +82,63 @@ business_days AS (
 
 COUNTER AS (
     SELECT
-        MONTHLY,
-        -- Counts records instead of summing TAT days
-        SUM(CASE WHEN SCRUB_TO_LOAD_TAT <= 2 THEN 1 ELSE 0 END) AS COUNT_LESS_THAN_EQUAL_2,
-        SUM(CASE WHEN SCRUB_TO_LOAD_TAT > 2 THEN 1 ELSE 0 END) AS COUNT_GREATER_THAN_2,
-        COUNT(*) AS TOTAL_COUNT
+    MONTHLY,
+    -- CHANGED HERE: Changed SCRUB_TO_LOAD_TAT to 1 to count records instead of summing days
+    SUM(case when Scrub_to_load_tat <= 2 then 1 ELSE 0 END) AS COUNT_LESS_THAN_2,
+    -- CHANGED HERE: Changed >3 to >2 and changed value to 1 to catch all remaining rows
+    SUM(case when Scrub_to_load_tat > 2 then 1 ELSE 0 END) AS COUNT_GREATER_THAN_2
+    
     FROM (
         SELECT
             stlv.SYS_ID,
             TO_CHAR(stlv.SYS_CREATED_ON_CST, 'MON-YYYY') AS MONTHLY,
-            CASE 
-                WHEN COUNT(bd.active_date) > 0 THEN COUNT(bd.active_date) - 1
+            stlv.SYS_CREATED_ON_CST,
+            U_RESOLVED_DATE_REPORTING,
+            CASE WHEN COUNT(bd.active_date) > 0 THEN COUNT(bd.active_date) - 1
                 ELSE 0
             END AS SCRUB_TO_LOAD_TAT
         FROM AJPGY_STG_WFSTAR_DB.BASE.VW_X_UHGEN_CS_CS_CRT_STLV stlv
+        LEFT JOIN AJPGY_STG_WFSTAR_DB.BASE.VW_SYS_USER usr
+            ON usr.SYS_ID = stlv.SYS_ID
+        CROSS JOIN metadata n
         LEFT JOIN business_days bd
             ON stlv.SYS_ID = bd.SYS_ID
-        WHERE stlv.U_RESOLVED_DATE_REPORTING IS NOT NULL 
+        WHERE stlv.U_RESOLVED_DATE_REPORTING IS NOT NULL -- Excludes incomplete records
         GROUP BY 
             stlv.SYS_ID,
-            TO_CHAR(stlv.SYS_CREATED_ON_CST, 'MON-YYYY')
+            TO_CHAR(stlv.SYS_CREATED_ON_CST, 'MON-YYYY'),
+            stlv.SYS_CREATED_ON_CST,
+            U_RESOLVED_DATE_REPORTING
     ) a
     GROUP BY MONTHLY
 ),
 
-PERCENTAGE AS (
+PERCENTAGE AS
+(
     SELECT
         MONTHLY,
-        COUNT_LESS_THAN_EQUAL_2,
+        COUNT_LESS_THAN_2,
         COUNT_GREATER_THAN_2,
-        TOTAL_COUNT,
-        CASE 
-            WHEN TOTAL_COUNT = 0 THEN 0
-            ELSE (COUNT_LESS_THAN_EQUAL_2 / TOTAL_COUNT) * 100
+        (COUNT_LESS_THAN_2 + COUNT_GREATER_THAN_2) AS TOTAL,
+        CASE WHEN (COUNT_LESS_THAN_2 + COUNT_GREATER_THAN_2) = 0 THEN 0
+             ELSE ((COUNT_LESS_THAN_2 / (COUNT_LESS_THAN_2 + COUNT_GREATER_THAN_2)) * 100)
         END AS PERCENTAGE
-    FROM COUNTER
+        
+        FROM
+        COUNTER
 )
 
 SELECT
     MONTHLY,
-    COUNT_LESS_THAN_EQUAL_2,
+    COUNT_LESS_THAN_2,
     COUNT_GREATER_THAN_2,
-    TOTAL_COUNT,
     PERCENTAGE,
-    -- Decimal-safe bounding corresponding to the document tiers
     CASE 
-        WHEN PERCENTAGE >= 94 THEN 5
-        WHEN PERCENTAGE >= 87 AND PERCENTAGE < 94 THEN 4
-        WHEN PERCENTAGE >= 80 AND PERCENTAGE < 87 THEN 3
-        WHEN PERCENTAGE >= 73 AND PERCENTAGE < 80 THEN 2
-        WHEN PERCENTAGE < 73 THEN 1 
+        WHEN PERCENTAGE >= 94 THEN '5'
+        WHEN PERCENTAGE >= 87 AND PERCENTAGE < 94 THEN '4'
+        WHEN PERCENTAGE >= 80 AND PERCENTAGE < 87 THEN '3'
+        WHEN PERCENTAGE >= 73 AND PERCENTAGE < 80 THEN '2'
+        WHEN PERCENTAGE < 73 THEN 'Fail - 1'
     END AS RESULTS
-FROM PERCENTAGE;
+FROM 
+PERCENTAGE;
