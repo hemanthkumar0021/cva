@@ -1,1 +1,138 @@
-ALTER USER your_snowflake_username SET RSA_PUBLIC_KEY='MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv1A...';
+WITH metadata AS (
+    SELECT CONVERT_TIMEZONE('UTC', 'America/Chicago', ELT_GET_CURRENT_SN_SNAPSHOT_TS()::TIMESTAMP_NTZ) as snapshot_ts_cst
+),
+
+seq_numbers AS (
+    SELECT ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1 AS n
+    FROM TABLE(GENERATOR(ROWCOUNT => 1000))
+),
+
+date_range AS (
+    SELECT
+        stlv.SYS_ID,
+        stlv.SYS_CREATED_ON_CST AS scrub,
+        U_RESOLVED_DATE_REPORTING AS load_v,
+        DATEADD('day', s.n, TO_DATE(stlv.SYS_CREATED_ON_CST)) AS active_date
+    FROM AJPGY_STG_WFSTAR_DB.BASE.VW_X_UHGEN_CS_CS_CRT_STLV stlv
+    LEFT JOIN AJPGY_STG_WFSTAR_DB.BASE.VW_SYS_USER usr
+        ON usr.SYS_ID = stlv.SYS_ID
+    CROSS JOIN metadata m
+    CROSS JOIN seq_numbers s
+    WHERE s.n <= DATEDIFF(
+        'day',
+        TO_DATE(stlv.SYS_CREATED_ON_CST),
+        TO_DATE(U_RESOLVED_DATE_REPORTING)
+    )
+    -- Explicitly ignore items that are not completed
+    AND U_RESOLVED_DATE_REPORTING IS NOT NULL 
+),
+
+HOLIDAYS AS
+(
+    SELECT
+    TO_DATE(TO_CHAR( holiday_date, 'DD/MM/YYYY'), 'DD/MM/YYYY') AS holiday_date
+    FROM
+    (
+        SELECT TO_DATE('01/03/22', 'MM/DD/YYYY') AS holiday_date UNION ALL
+        SELECT TO_DATE('01/17/22', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('05/30/22', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('07/04/22', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('09/05/22', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('11/24/22', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('11/25/22', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('12/26/22', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('01/02/23', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('01/16/23', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('05/29/23', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('07/04/23', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('09/04/23', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('11/23/23', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('11/24/23', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('12/25/23', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('01/01/24', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('01/15/24', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('05/27/24', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('07/04/24', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('09/02/24', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('11/28/24', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('11/29/24', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('12/25/24', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('01/01/25', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('01/20/25', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('05/26/25', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('07/04/25', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('09/01/25', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('11/27/25', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('11/28/25', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('12/25/25', 'MM/DD/YYYY') UNION ALL
+        SELECT TO_DATE('01/01/26', 'MM/DD/YYYY')
+    ) A
+),
+
+business_days AS (
+    SELECT
+        dr.SYS_ID,
+        dr.scrub,
+        dr.load_v,
+        dr.active_date
+    FROM date_range dr
+    LEFT JOIN HOLIDAYS h
+        ON dr.active_date = h.HOLIDAY_DATE
+    WHERE DAYOFWEEKISO(dr.active_date) BETWEEN 1 AND 5
+      AND h.HOLIDAY_DATE IS NULL
+),
+
+COUNTER AS (
+    SELECT
+        MONTHLY,
+        -- Counts records instead of summing TAT days
+        SUM(CASE WHEN SCRUB_TO_LOAD_TAT <= 2 THEN 1 ELSE 0 END) AS COUNT_LESS_THAN_EQUAL_2,
+        SUM(CASE WHEN SCRUB_TO_LOAD_TAT > 2 THEN 1 ELSE 0 END) AS COUNT_GREATER_THAN_2,
+        COUNT(*) AS TOTAL_COUNT
+    FROM (
+        SELECT
+            stlv.SYS_ID,
+            TO_CHAR(stlv.SYS_CREATED_ON_CST, 'MON-YYYY') AS MONTHLY,
+            CASE 
+                WHEN COUNT(bd.active_date) > 0 THEN COUNT(bd.active_date) - 1
+                ELSE 0
+            END AS SCRUB_TO_LOAD_TAT
+        FROM AJPGY_STG_WFSTAR_DB.BASE.VW_X_UHGEN_CS_CS_CRT_STLV stlv
+        LEFT JOIN business_days bd
+            ON stlv.SYS_ID = bd.SYS_ID
+        WHERE stlv.U_RESOLVED_DATE_REPORTING IS NOT NULL 
+        GROUP BY 
+            stlv.SYS_ID,
+            TO_CHAR(stlv.SYS_CREATED_ON_CST, 'MON-YYYY')
+    ) a
+    GROUP BY MONTHLY
+),
+
+PERCENTAGE AS (
+    SELECT
+        MONTHLY,
+        COUNT_LESS_THAN_EQUAL_2,
+        COUNT_GREATER_THAN_2,
+        TOTAL_COUNT,
+        CASE 
+            WHEN TOTAL_COUNT = 0 THEN 0
+            ELSE (COUNT_LESS_THAN_EQUAL_2 / TOTAL_COUNT) * 100
+        END AS PERCENTAGE
+    FROM COUNTER
+)
+
+SELECT
+    MONTHLY,
+    COUNT_LESS_THAN_EQUAL_2,
+    COUNT_GREATER_THAN_2,
+    TOTAL_COUNT,
+    PERCENTAGE,
+    -- Decimal-safe bounding corresponding to the document tiers
+    CASE 
+        WHEN PERCENTAGE >= 94 THEN 5
+        WHEN PERCENTAGE >= 87 AND PERCENTAGE < 94 THEN 4
+        WHEN PERCENTAGE >= 80 AND PERCENTAGE < 87 THEN 3
+        WHEN PERCENTAGE >= 73 AND PERCENTAGE < 80 THEN 2
+        WHEN PERCENTAGE < 73 THEN 1 
+    END AS RESULTS
+FROM PERCENTAGE;
