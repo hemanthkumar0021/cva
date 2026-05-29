@@ -1,26 +1,2 @@
-WITH date_bounds AS (
-    -- Step 1: Find the absolute minimum and maximum dates in your dataset
-    SELECT 
-        MIN(start_date) AS min_date, 
-        MAX(end_date) AS max_date 
-    FROM your_table
-),
+ALTER USER your_snowflake_username SET RSA_PUBLIC_KEY='MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv1A...';
 
-virtual_calendar AS (
-    -- Step 2: Generate a sequential list of dates between those bounds
-    SELECT 
-        DATEADD('day', ROW_NUMBER() OVER (ORDER BY NULL) - 1, min_date) AS cal_date
-    FROM date_bounds
-    CROSS JOIN TABLE(GENERATOR(ROWCOUNT => 15000)) -- 15,000 rows covers ~40 years of dates
-)
-
--- Step 3: Join your data back to the virtual calendar and filter out weekends
-SELECT 
-    t.*, -- Keeps all your original columns
-    COUNT(c.cal_date) AS working_days
-FROM your_table t
-LEFT JOIN virtual_calendar c 
-  ON c.cal_date >= t.start_date 
- AND c.cal_date <= t.end_date
- AND DAYOFWEEKISO(c.cal_date) NOT IN (6, 7) -- 6 is Saturday, 7 is Sunday
-GROUP BY ALL; -- Automatically groups by all of your original columns
