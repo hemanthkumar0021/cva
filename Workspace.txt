@@ -1,1 +1,1 @@
-fs.azure.account.key.cubestgaccount.blob.core.windows.net <your-copied-key>
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Users\rnemuri\Downloads\your_key_file.p8"))
