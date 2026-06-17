@@ -1,1 +1,1 @@
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Users\rnemuri\Downloads\your_key_file.p8"))
+openssl pkcs8 -nocrypt -in rsa_key_3.p8 -out rsa_key_3.pem
