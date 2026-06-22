@@ -1,1 +1,8 @@
-openssl pkcs8 -nocrypt -in rsa_key_3.p8 -out rsa_key_3.pem
+DELETE FROM TABLE_NAME
+WHERE DATE(STATE_START_TIME_CT) NOT IN (
+  DATE('2026-05-01'),
+  DATE('2026-05-02'),
+  DATE('2026-05-03'),
+  DATE('2026-05-04'),
+  DATE('2026-05-05')
+);
