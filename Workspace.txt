@@ -1,8 +1,1 @@
-DELETE FROM TABLE_NAME
-WHERE DATE(STATE_START_TIME_CT) NOT IN (
-  DATE('2026-05-01'),
-  DATE('2026-05-02'),
-  DATE('2026-05-03'),
-  DATE('2026-05-04'),
-  DATE('2026-05-05')
-);
+@concat('select ', item().sql_query, ' from ', item().source_db, '.', item().source_table_schema, '.', item().source_table_name)
