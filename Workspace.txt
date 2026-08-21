@@ -1,5 +1,5 @@
-ALTER TABLE my_catalog.my_schema.my_table 
-SET TBLPROPERTIES (
-  'delta.enableIcebergCompatV2' = 'true',
-  'delta.universalFormat.enabledFormats' = 'iceberg'
-);
+path = "abfss://cubeatlasdata@cube...storageaccount.dfs.core.windows.net/landing/SF/landing/MEDUSA_V_F_D_SPLIT/"
+
+display(dbutils.fs.ls(path))
+
+
