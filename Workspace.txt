@@ -1,5 +1,4 @@
-source_path = "abfss://<source_container>@<SOURCE_ACCOUNT_NAME>.dfs.core.windows.net/<source_folder>/"
-dest_path = "abfss://<dest_container>@<DEST_ACCOUNT_NAME>.dfs.core.windows.net/<dest_folder>/"
-
-# Copy the files
-dbutils.fs.cp(source_path, dest_path, recurse=True)
+spark.conf.set(
+    "fs.azure.account.key.cubestgaccount.dfs.core.windows.net",
+    "<paste_your_copied_key_here>"
+)
