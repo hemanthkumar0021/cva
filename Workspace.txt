@@ -1,5 +1,5 @@
-path = "abfss://cubeatlasdata@cube...storageaccount.dfs.core.windows.net/landing/SF/landing/MEDUSA_V_F_D_SPLIT/"
+source_path = "abfss://<source_container>@<SOURCE_ACCOUNT_NAME>.dfs.core.windows.net/<source_folder>/"
+dest_path = "abfss://<dest_container>@<DEST_ACCOUNT_NAME>.dfs.core.windows.net/<dest_folder>/"
 
-display(dbutils.fs.ls(path))
-
-
+# Copy the files
+dbutils.fs.cp(source_path, dest_path, recurse=True)
