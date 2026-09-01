@@ -1,14 +1,14 @@
-# 1. Write the coalesced data to a temporary folder
-temp_path = f"{gold_path}_temp"
-df_srp.coalesce(1).write.mode("overwrite").parquet(temp_path)
+from pyspark.sql.functions import col, current_date, date_sub
 
-# 2. Find the generated 'part-00000' file inside the temp folder
-files = dbutils.fs.ls(temp_path)
-part_file = [f.path for f in files if f.name.startswith("part-")][0]
+# 1. Read the source table
+df_srp_full = spark.table("med_cube_nprd.iex_gold.iex_schedule_blue")
 
-# 3. Move and rename it to your final desired path/name
-final_file_path = f"{gold_path}/iex_org_chart_blue_archive.parquet"
-dbutils.fs.mv(part_file, final_file_path)
+# 2. Filter the data for the last 14 days
+# REPLACE "your_date_column" with the actual date or timestamp column in your table
+df_srp_filtered = df_srp_full.filter(col("your_date_column") >= date_sub(current_date(), 14))
 
-# 4. Clean up the temporary folder and its metadata files
-dbutils.fs.rm(temp_path, recurse=True)
+# 3. Write the filtered data
+df_srp_filtered.write.mode("overwrite").parquet(iex_schedule_blue)
+
+print(f"Data written to: {iex_schedule_blue}")
+print(f"Records written: {df_srp_filtered.count()}")
