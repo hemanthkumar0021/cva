@@ -1,4 +1,14 @@
-spark.conf.set(
-    "fs.azure.account.key.cubestgaccount.dfs.core.windows.net",
-    "<paste_your_copied_key_here>"
-)
+# 1. Write the coalesced data to a temporary folder
+temp_path = f"{gold_path}_temp"
+df_srp.coalesce(1).write.mode("overwrite").parquet(temp_path)
+
+# 2. Find the generated 'part-00000' file inside the temp folder
+files = dbutils.fs.ls(temp_path)
+part_file = [f.path for f in files if f.name.startswith("part-")][0]
+
+# 3. Move and rename it to your final desired path/name
+final_file_path = f"{gold_path}/iex_org_chart_blue_archive.parquet"
+dbutils.fs.mv(part_file, final_file_path)
+
+# 4. Clean up the temporary folder and its metadata files
+dbutils.fs.rm(temp_path, recurse=True)
