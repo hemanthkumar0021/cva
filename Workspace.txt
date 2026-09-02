@@ -1,27 +1,8 @@
-SQL Server
-SELECT 
-    c.name AS COLUMN_NAME,
-    t.name AS DATA_TYPE,
-    c.max_length AS CHARACTER_MAXIMUM_LENGTH, -- Length in bytes (-1 for MAX types)
-    c.precision AS NUMERIC_PRECISION,
-    c.scale AS NUMERIC_SCALE,
-    c.is_nullable AS IS_NULLABLE
-FROM sys.columns c
-JOIN sys.types t 
-    ON c.user_type_id = t.user_type_id
-WHERE c.object_id = OBJECT_ID('YOUR_SCHEMA_NAME.YOUR_TABLE_NAME') -- Replace with your schema and table name
-ORDER BY c.column_id;
+ALTER TABLE OPTUM.SB_F_ACTIVITYHEADER_test
+ALTER COLUMN ACTIVITY_ID DECIMAL(38, 0) NOT NULL;
 
+ALTER TABLE OPTUM.SB_F_ACTIVITYHEADER_test
+ALTER COLUMN START_MINUTE DECIMAL(38, 0) NOT NULL;
 
-Snowflake 
-SELECT 
-    COLUMN_NAME,
-    DATA_TYPE,
-    CHARACTER_MAXIMUM_LENGTH,
-    NUMERIC_PRECISION,
-    NUMERIC_SCALE,
-    IS_NULLABLE
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = 'YOUR_SCHEMA_NAME'  -- Replace with your schema name
-  AND TABLE_NAME = 'YOUR_TABLE_NAME'      -- Replace with your table/view name
-ORDER BY ORDINAL_POSITION;
+ALTER TABLE OPTUM.SB_F_ACTIVITYHEADER_test
+ALTER COLUMN LENGTH DECIMAL(38, 0) NOT NULL;
