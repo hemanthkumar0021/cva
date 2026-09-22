@@ -1,47 +1,9 @@
-# 1. Fetch the list of source tables using the provided SQL query
-query = "select source_table_name from med_cube_nprd.configuration_schema.control_trans_dev where control_main_id=3 and load_type = 'FULL_LOAD'"
-tables_df = spark.sql(query)
-
-# Convert the DataFrame column to a Python list
-table_list = [row.source_table_name for row in tables_df.collect()]
-
-# 2. Iterate through each table and run the processing logic
-for current_table in table_list:
-    print(f"\n--- Processing table: {current_table} ---")
-    
-    # Set up paths
-    gold_path = f"abfss://gold@udlpallotherzones7bcqdd.dfs.core.windows.net/optum_call_data/{current_table}"
-    current_table_path = f"{gold_path}/"
-    
-    # Delete existing files before writing to ensure a clean output
-    try:
-        dbutils.fs.rm(current_table_path, recurse=True)
-        print(f"Deleted existing directory at: {current_table_path}")
-    except Exception as e:
-        print(f"No existing files to delete (or path not found): {e}")
-
-    # Read from the source table
-    current_table_temp = f"prod_conn_snow_internal_audit_system_streamlit_notebook_wh_cdw_prd_call_db_catalog.cdw_shared_services_rpt_sc.{current_table}"
-    df_srp = spark.table(current_table_temp)
-    
-    # Write the coalesced data to a temporary folder
-    temp_path = f"{gold_path}_temp"
-    df_srp.coalesce(1).write.mode("overwrite").parquet(temp_path)
-    
-    # Find the generated 'part-' file inside the temp folder
-    files = dbutils.fs.ls(temp_path)
-    part_file = [f.path for f in files if f.name.startswith("part-")][0]
-    
-    # Set final destination and name
-    current_table_path_parquet = f"{current_table_path}{current_table}.parquet"
-    
-    # Move and rename it to your final desired path/name
-    dbutils.fs.mv(part_file, current_table_path_parquet)
-    
-    # Clean up the temporary folder and its metadata files
-    dbutils.fs.rm(temp_path, recurse=True)
-    
-    # Print validation metrics for the current table in the loop
-    df = spark.read.parquet(current_table_path_parquet)
-    print(f"Successfully written to: {current_table_path_parquet}")
-    print(f"Records written: {df.count()}")
+update_query = f"""
+        UPDATE med_cube_nprd.configuration_schema.control_trans_dev
+        SET last_loaded_date = current_timestamp()
+        WHERE source_table_name = '{current_table}'
+          AND control_main_id = 3
+          AND load_type = 'FULL_LOAD'
+    """
+    spark.sql(update_query)
+    print(f"Updated control record for {current_table}\n")
