@@ -1,11 +1,6 @@
-# Extract the comma-separated string as done above
-columns_string = spark.sql(control_query).first()["sql_query"]
-
-current_table_temp = f"prod_conn_snow_internal_audit_system_streamlit_notebook_wh_cdw_prd_call_db_catalog.cdw_shared_services_rpt_sc.{current_table}"
-
-# Construct the full SQL query dynamically
-df_srp = spark.sql(f"SELECT {columns_string} FROM {current_table_temp}")
-
-# Write the coalesced data to a temporary folder
-temp_path = f"{gold_path}_temp"
-df_srp.coalesce(1).write.mode("overwrite").parquet(temp_path)
+# 1. Fetch the column selection string from the control table
+control_query = f"""
+    SELECT sql_query 
+    FROM med_cube_nprd.configuration_schema.control_trans_dev 
+    WHERE control_main_id=3 AND destination_table = '{current_table}'
+"""
