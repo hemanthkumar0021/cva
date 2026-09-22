@@ -1,9 +1,11 @@
-update_query = f"""
-        UPDATE med_cube_nprd.configuration_schema.control_trans_dev
-        SET last_loaded_date = current_timestamp()
-        WHERE source_table_name = '{current_table}'
-          AND control_main_id = 3
-          AND load_type = 'FULL_LOAD'
-    """
-    spark.sql(update_query)
-    print(f"Updated control record for {current_table}\n")
+# Extract the comma-separated string as done above
+columns_string = spark.sql(control_query).first()["sql_query"]
+
+current_table_temp = f"prod_conn_snow_internal_audit_system_streamlit_notebook_wh_cdw_prd_call_db_catalog.cdw_shared_services_rpt_sc.{current_table}"
+
+# Construct the full SQL query dynamically
+df_srp = spark.sql(f"SELECT {columns_string} FROM {current_table_temp}")
+
+# Write the coalesced data to a temporary folder
+temp_path = f"{gold_path}_temp"
+df_srp.coalesce(1).write.mode("overwrite").parquet(temp_path)
