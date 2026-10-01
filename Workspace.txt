@@ -1,6 +1,18 @@
-# 1. Fetch the column selection string from the control table
-control_query = f"""
-    SELECT sql_query 
-    FROM med_cube_nprd.configuration_schema.control_trans_dev 
-    WHERE control_main_id=3 AND destination_table = '{current_table}'
-"""
+# 1. Read the written parquet files from your path
+df_stage = spark.read.parquet(gold_path)
+
+# 2. Target table details
+target_table = "med_cube_nprd_dde_gold.srp_cs_dde_ifp_triage_test"
+
+# 3. Write directly into the Unity Catalog / Hive Metastore table as Delta format
+# Use mode("overwrite") or mode("append") based on your requirement
+(
+    df_stage.write.format("delta")
+    .mode("overwrite")
+    .option("overwriteSchema", "true")
+    .saveAsTable(target_table)
+)
+
+print(
+    f"Successfully loaded {df_stage.count()} records into table: {target_table}"
+)
