@@ -15,4 +15,3 @@ target_table = "med_cube_nprd_dde_gold.srp_cs_dde_ifp_triage_test"
 
 print(
     f"Successfully loaded {df_stage.count()} records into table: {target_table}"
-)
