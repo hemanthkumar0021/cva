@@ -1,8 +1,9 @@
-SELECT RAISE_ERROR(
-    CONCAT(
-        'CLUSTER ID: [', spark_partition_id(), ' / ', COALESCE(NULLIF(current_setting('spark.databricks.clusterUsageTags.clusterId', false), ''), 'UNKNOWN'), '] | ',
-        'CLUSTER NAME: [', COALESCE(NULLIF(current_setting('spark.databricks.clusterUsageTags.clusterName', false), ''), 'UNKNOWN'), '] | ',
-        'ACTIVE CATALOG: [', current_catalog(), '] | ',
-        'ACTIVE SCHEMA: [', current_schema(), ']'
-    )
-);
+dbutils.widgets.text("database_name", "intradiem_fo_gold", "Target Database")
+dbutils.widgets.text("table_name", "optum_userlastlogin", "Target Table")
+
+# Retrieve the dynamic value into Python variables
+db_name = dbutils.widgets.get("database_name")
+tbl_name = dbutils.widgets.get("table_name")
+
+print(f"Selected Database: {db_name}")
+print(f"Selected Table:    {tbl_name}")
