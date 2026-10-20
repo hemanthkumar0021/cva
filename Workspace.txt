@@ -1,1 +1,1 @@
-@formatDateTime(utcnow(), 'yyyy-MM-dd')
+DELETE FROM dbo.SRP_CS_DDE_IFP_Triage_Summary WHERE IMPORTDATE <= DATEADD(day, -365, CAST('@{formatDateTime(utcnow(), 'yyyy-MM-dd')}' AS date)); DELETE FROM dbo.SRP_CS_DDE_IFP_Triage_Summary WHERE IMPORTDATE = CAST('@{formatDateTime(utcnow(), 'yyyy-MM-dd')}' AS date);
