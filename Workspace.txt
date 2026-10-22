@@ -1,17 +1,6 @@
-from datetime import datetime, timezone
+# If querying from your existing df_srp DataFrame:
+display(df_srp.select("IMPORTDATE").distinct())
 
-# 1. Generate the date string in 'yyyy-MM-dd' UTC format (matching @formatDateTime(utcnow(), 'yyyy-MM-dd'))
-archive_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-# 2. Source file path
-final_file_path = f"{staging_path}/SRP_CS_DDE_IFP_Triage.parquet"
-
-# 3. Archive target directory and destination path
-archive_dir = f"{staging_path}/archive/{archive_date}"
-archive_file_path = f"{archive_dir}/SRP_CS_DDE_IFP_Triage.parquet"
-
-# 4. Copy (or move) to archive
-# Using cp copies the file; use mv if you want to move it instead of keeping it in staging
-dbutils.fs.cp(final_file_path, archive_file_path)
-
-print(f"Archived file to: {archive_file_path}")
+# Or if reading directly from the parquet path:
+df_parquet = spark.read.parquet(current_table_path)
+display(df_parquet.select("IMPORTDATE").distinct())
