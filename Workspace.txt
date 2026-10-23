@@ -1,6 +1,31 @@
-# If querying from your existing df_srp DataFrame:
-display(df_srp.select("IMPORTDATE").distinct())
+# 1. Filter the dataset using your query
+df = spark.sql("""
+    SELECT * 
+    FROM `ewo-wfm-prod`.dde_gold.srp_cs_dde_ifp_triage_summary 
+    WHERE importdate < '2026-10-06'
+""")
 
-# Or if reading directly from the parquet path:
-df_parquet = spark.read.parquet(current_table_path)
-display(df_parquet.select("IMPORTDATE").distinct())
+# 2. Temporary folder path in FileStore
+temp_csv_path = "/FileStore/export_temp"
+final_file_name = "srp_cs_dde_ifp_triage_summary_all.csv"
+
+# 3. Write out coalesced to 1 partition
+(
+    df.coalesce(1)
+    .write.mode("overwrite")
+    .option("header", "true")
+    .option("delimiter", ",")
+    .csv(temp_csv_path)
+)
+
+# 4. Find the generated part file and move it to a clean file name
+part_file = [
+    f.path for f in dbutils.fs.ls(temp_csv_path) if f.name.endswith(".csv")
+][0]
+dbutils.fs.cp(part_file, f"/FileStore/{final_file_name}")
+dbutils.fs.rm(temp_csv_path, recurse=True)
+
+# 5. Render a clickable download link in the notebook
+displayHTML(
+    f"""<a href="/files/{final_file_name}?o={spark.conf.get('spark.databricks.workspaceUrl')}" download style="font-size:16px; font-weight:bold; color:#0066cc;">⬇ Click here to download all rows as CSV</a>"""
+)
