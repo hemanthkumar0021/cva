@@ -1,6 +1,5 @@
-# Check what exists inside the bronze container
-display(
-    dbutils.fs.ls(
-        "abfss://landingzone@udlplanding7bcqdd.dfs.core.windows.net/bronze/"
-    )
-)
+import time
+
+print("Waiting for 30 seconds buffer...")
+time.sleep(30)
+print("Resuming execution...")
