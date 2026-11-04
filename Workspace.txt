@@ -1,5 +1,4 @@
-import time
-
-print("Waiting for 30 seconds buffer...")
-time.sleep(30)
-print("Resuming execution...")
+%sql
+SELECT *
+FROM parquet.`abfss://gold@udlpallotherzones7bcqdd.dfs.core.windows.net/optum_call_data/MEDUSA_V_F_CT_RESULTS/MEDUSA_V_F_CT_RESULTS.parquet`
+WHERE to_date(row_date) > to_date('2026-11-02');
